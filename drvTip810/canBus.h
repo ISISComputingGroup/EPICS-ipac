@@ -10,11 +10,9 @@ Description:
     CANBUS specific constants
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     25 July 1995
-Version:
-    $Id: canBus.h 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -96,9 +94,9 @@ epicsShareFunc int canBusRestart(const char *busName);
 epicsShareFunc int canRead(canBusID_t busID, canMessage_t *pmessage, double timeout);
 epicsShareFunc int canWrite(canBusID_t busID, const canMessage_t *pmessage,
 		    double timeout);
-epicsShareFunc int canMessage(canBusID_t busID, canID_t identifier, 
+epicsShareFunc int canMessage(canBusID_t busID, canID_t identifier,
 		      canMsgCallback_t callback, void *pprivate);
-epicsShareFunc int canMsgDelete(canBusID_t busID, canID_t identifier, 
+epicsShareFunc int canMsgDelete(canBusID_t busID, canID_t identifier,
 			canMsgCallback_t callback, void *pprivate);
 epicsShareFunc int canSignal(canBusID_t busID, canSigCallback_t callback,
 		     void *pprivate);
@@ -106,4 +104,3 @@ epicsShareFunc int canIoParse(char *canString, canIo_t *pcanIo);
 
 
 #endif /* INCcanBusH */
-

@@ -7,15 +7,13 @@ File:
     ipic.h
 
 Description:
-    IndustryPack Interface Controller ASIC header file, giving the register 
+    IndustryPack Interface Controller ASIC header file, giving the register
     layout and programming model for the IPIC chip used on the MVME162.
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     6 July 1995
-Version:
-    $Id: ipic.h 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -102,4 +100,3 @@ typedef volatile struct {
 #endif
 
 #endif /* INCipicH */
-

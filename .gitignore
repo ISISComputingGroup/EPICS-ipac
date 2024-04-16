@@ -1,0 +1,8 @@
+/bin
+/configure/*.local
+/db
+/dbd
+/html
+/include
+/lib
+**/O.*

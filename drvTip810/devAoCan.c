@@ -10,11 +10,9 @@ Description:
     CANBUS Analogue Output device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     9 August 1995
-Version:
-    $Id: devAoCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -41,6 +39,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <math.h>
 #include <float.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbAccess.h>
@@ -82,28 +82,29 @@ typedef struct aoCanBus_s {
     int status;
 } aoCanBus_t;
 
-static long init_ao(struct aoRecord *prec);
-static long get_ioint_info(int cmd, struct aoRecord *prec, IOSCANPVT *ppvt);
+static long init_ao(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long write_ao(struct aoRecord *prec);
 static long special_linconv(struct aoRecord *prec, int after);
 static void aoMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pCallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN write_ao;
-    DEVSUPFUN special_linconv;
-} devAoCan = {
-    6,
-    NULL,
-    NULL,
-    init_ao,
-    get_ioint_info,
+#ifndef HAS_aodset
+typedef struct aodset {
+    dset common;
+    long (*write_ao)(struct aoRecord *prec);
+    long (*special_linconv)(struct aoRecord *prec, int after);
+} aodset;
+#endif
+aodset devAoCan = {
+    {
+        6,
+        NULL,
+        NULL,
+        init_ao,
+        get_ioint_info
+    },
     write_ao,
     special_linconv
 };
@@ -113,8 +114,9 @@ static aoCanBus_t *firstBus;
 
 
 static long init_ao (
-    struct aoRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct aoRecord *prec = (struct aoRecord *) pcommon;
     aoCanPrivate_t *pcanAo;
     aoCanBus_t *pbus;
     int status;
@@ -238,9 +240,10 @@ static long init_ao (
 
 static long get_ioint_info (
     int cmd,
-    struct aoRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct aoRecord *prec = (struct aoRecord *) pcommon;
     aoCanPrivate_t *pcanAo = prec->dpvt;
 
     if (pcanAo->ioscanpvt == NULL) {

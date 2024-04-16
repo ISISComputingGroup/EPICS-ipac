@@ -10,11 +10,9 @@ Description:
     CANBUS Multi-Bit Binary Output device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     14 August 1995
-Version:
-    $Id: devMbboCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -38,6 +36,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbAccess.h>
@@ -76,26 +76,27 @@ typedef struct mbboCanBus_s {
     int status;
 } mbboCanBus_t;
 
-static long init_mbbo(struct mbboRecord *prec);
-static long get_ioint_info(int cmd, struct mbboRecord *prec, IOSCANPVT *ppvt);
+static long init_mbbo(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long write_mbbo(struct mbboRecord *prec);
 static void mbboMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pCallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN write_mbbo;
-} devMbboCan = {
-    5,
-    NULL,
-    NULL,
-    init_mbbo,
-    get_ioint_info,
+#ifndef HAS_mbbodset
+typedef struct {
+    dset common;
+    long (*write_mbbo)(struct mbboRecord *prec);
+} mbbodset;
+#endif
+mbbodset devMbboCan = {
+    {
+        5,
+        NULL,
+        NULL,
+        init_mbbo,
+        get_ioint_info
+    },
     write_mbbo
 };
 epicsExportAddress(dset, devMbboCan);
@@ -104,8 +105,9 @@ static mbboCanBus_t *firstBus;
 
 
 static long init_mbbo (
-    struct mbboRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct mbboRecord *prec = (struct mbboRecord *) pcommon;
     mbboCanPrivate_t *pcanMbbo;
     mbboCanBus_t *pbus;
     int status;
@@ -194,9 +196,10 @@ static long init_mbbo (
 
 static long get_ioint_info (
     int cmd,
-    struct mbboRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct mbboRecord *prec = (struct mbboRecord *) pcommon;
     mbboCanPrivate_t *pcanMbbo = prec->dpvt;
 
     if (pcanMbbo->ioscanpvt == NULL) {

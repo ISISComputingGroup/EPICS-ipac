@@ -10,11 +10,9 @@ Description:
     CANBUS Multi-Bit Binary Output Direct device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     14 August 1995
-Version:
-    $Id: devMbboDirectCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -38,6 +36,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbAccess.h>
@@ -76,26 +76,27 @@ typedef struct mbboDirectCanBus_s {
     int status;
 } mbboDirectCanBus_t;
 
-static long init_mbboDirect(struct mbboDirectRecord *prec);
-static long get_ioint_info(int cmd, struct mbboDirectRecord *prec, IOSCANPVT *ppvt);
+static long init_mbboDirect(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long write_mbboDirect(struct mbboDirectRecord *prec);
 static void mbboDirectMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pCallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN write_mbboDirect;
-} devMbboDirectCan = {
-    5,
-    NULL,
-    NULL,
-    init_mbboDirect,
-    get_ioint_info,
+#ifndef HAS_mbbodirectdset
+typedef struct {
+    dset common;
+    long (*write_mbboDirect)(struct mbboDirectRecord *prec);
+} mbbodirectdset;
+#endif
+mbbodirectdset devMbboDirectCan = {
+    {
+        5,
+        NULL,
+        NULL,
+        init_mbboDirect,
+        get_ioint_info
+    },
     write_mbboDirect
 };
 epicsExportAddress(dset, devMbboDirectCan);
@@ -104,8 +105,9 @@ static mbboDirectCanBus_t *firstBus;
 
 
 static long init_mbboDirect (
-    struct mbboDirectRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct mbboDirectRecord *prec = (struct mbboDirectRecord *) pcommon;
     mbboDirectCanPrivate_t *pcanMbboDirect;
     mbboDirectCanBus_t *pbus;
     int status;
@@ -194,9 +196,10 @@ static long init_mbboDirect (
 
 static long get_ioint_info (
     int cmd,
-    struct mbboDirectRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct mbboDirectRecord *prec = (struct mbboDirectRecord *) pcommon;
     mbboDirectCanPrivate_t *pcanMbboDirect = prec->dpvt;
 
     if (pcanMbboDirect->ioscanpvt == NULL) {

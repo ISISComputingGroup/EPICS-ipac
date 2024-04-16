@@ -10,11 +10,9 @@ Description:
     CANBUS Binary Input device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     14 August 1995
-Version:
-    $Id: devBiCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -38,6 +36,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbAccess.h>
@@ -79,27 +79,28 @@ typedef struct biCanBus_s {
     int status;
 } biCanBus_t;
 
-static long init_bi(struct biRecord *prec);
-static long get_ioint_info(int cmd, struct biRecord *prec, IOSCANPVT *ppvt);
+static long init_bi(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long read_bi(struct biRecord *prec);
 static void ProcessCallback(CALLBACK *pcallback);
 static void biMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pcallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN read_bi;
-} devBiCan = {
-    5,
-    NULL,
-    NULL,
-    init_bi,
-    get_ioint_info,
+#ifndef HAS_bidset
+typedef struct {
+    dset common;
+    long (*read_bi)(struct biRecord *prec);
+} bidset;
+#endif
+bidset devBiCan = {
+    {
+        5,
+        NULL,
+        NULL,
+        init_bi,
+        get_ioint_info
+    },
     read_bi
 };
 epicsExportAddress(dset, devBiCan);
@@ -108,8 +109,9 @@ static biCanBus_t *firstBus;
 
 
 static long init_bi (
-    struct biRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct biRecord *prec = (struct biRecord *) pcommon;
     biCanPrivate_t *pcanBi;
     biCanBus_t *pbus;
     int status;
@@ -209,9 +211,10 @@ static long init_bi (
 
 static long get_ioint_info (
     int cmd,
-    struct biRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct biRecord *prec = (struct biRecord *) pcommon;
     biCanPrivate_t *pcanBi = prec->dpvt;
 
     if (pcanBi->ioscanpvt == NULL) {

@@ -11,11 +11,9 @@ Description:
     drivers and the IPAC Carrier drivers.
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     3 July 1995
-Version:
-    $Id: drvIpac.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2007 Andrew Johnson
 
@@ -36,17 +34,22 @@ Copyright (c) 1995-2007 Andrew Johnson
 *******************************************************************************/
 
 
+/* ANSI headers */
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
+/* EPICS headers */
+#include <epicsTypes.h>
+#include <errMdef.h>
 #include <drvSup.h>
 #include <epicsStdio.h>
-#include <epicsExport.h>
 #include <cantProceed.h>
 #include <devLib.h>
 #include <iocsh.h>
+#include <epicsExport.h>
 
+/* Module headers */
 #include "drvIpac.h"
 
 
@@ -79,12 +82,12 @@ LOCAL ipac_carrier_t nullCarrier = {
 
 /* Driver Support Entry Table */
 
-LOCAL int ipacInitialise(int after);
+LOCAL long ipacInitialise(void);
 
-struct drvet drvIpac = {
-    2, 
-    (DRVSUPFUN) ipacReport, 
-    (DRVSUPFUN) ipacInitialise
+drvet drvIpac = {
+    2,
+    ipacReport,
+    ipacInitialise
 };
 epicsExportAddress(drvet, drvIpac);
 
@@ -98,8 +101,14 @@ static void ipacReportCallFunc(const iocshArgBuf *args) {
     ipacReport(args[0].ival);
 }
 
+static const iocshFuncDef ipacAddNullFuncDef = {"ipacAddNullCarrier",0};
+static void ipacAddNullCallFunc(const iocshArgBuf *args) {
+    ipacAddNullCarrier();
+}
+
 void ipacRegistrar(void) {
-    iocshRegister(&ipacReportFuncDef,ipacReportCallFunc);
+    iocshRegister(&ipacReportFuncDef, ipacReportCallFunc);
+    iocshRegister(&ipacAddNullFuncDef, ipacAddNullCallFunc);
 }
 epicsExportRegistrar(ipacRegistrar);
 
@@ -113,22 +122,22 @@ Purpose:
     Used to register a carrier board & carrier driver with the IPAC driver.
 
 Description:
-    Usually called from the vxWorks (EPICS) startup script.  Some types of 
+    Usually called from the vxWorks (EPICS) startup script.  Some types of
     carrier may need additional initilisation before or after registering,
-    but the card parameter string should be sufficient for most carriers.  
-    Note that only the carrier initialise routine is called at this stage.  
-    The order in which carriers are registered with this routine specifies 
+    but the card parameter string should be sufficient for most carriers.
+    Note that only the carrier initialise routine is called at this stage.
+    The order in which carriers are registered with this routine specifies
     the carrier number which they will be allocated, starting from zero.
 
     Checks that the carrier descriptor table looks sensible, then calls the
-    initialise routine with the given card parameters, and saves the carrier 
-    private pointer and carrier table address.  The card number allows the 
+    initialise routine with the given card parameters, and saves the carrier
+    private pointer and carrier table address.  The card number allows the
     same descriptor to be used for all carriers of the same type.
 
-    It may be necessary to remove a carrier temporarily from a system in 
-    some circumstances without wanting to have to change the carrier number 
-    allocated to higher numbered carriers.  To allow this, it is legal to 
-    call this routine with a NULL (zero) carrier table address, which 
+    It may be necessary to remove a carrier temporarily from a system in
+    some circumstances without wanting to have to change the carrier number
+    allocated to higher numbered carriers.  To allow this, it is legal to
+    call this routine with a NULL (zero) carrier table address, which
     switches in the null carrier table instead.
 
     As long as the carrier table is not full, ipacAddCarrier() will always
@@ -178,7 +187,7 @@ int ipacAddCarrier (
     status = pcarrierTable->initialise(cardParams,
 	     &carriers.info[carriers.latest].cPrivate, carriers.latest);
     if (status) {
-	printf("ipacAddCarrier: %s driver returned an error.\n", 
+	printf("ipacAddCarrier: %s driver returned an error.\n",
 		pcarrierTable->carrierType);
 	return status;
     }
@@ -186,6 +195,31 @@ int ipacAddCarrier (
     carriers.info[carriers.latest].driver = pcarrierTable;
 
     return OK;
+}
+
+
+/*******************************************************************************
+
+Routine:
+    ipacAddNullCarrier
+
+Purpose:
+    Used to reserve a carrier number.
+
+Description:
+    Registers a null carrier.
+
+Returns:
+    0 = OK,
+    S_IPAC_tooMany = Carrier Info Table full.
+
+Example:
+    ipacAddNullCarrier();
+
+*/
+
+int ipacAddNullCarrier (void) {
+    return ipacAddCarrier(NULL, NULL);
 }
 
 
@@ -221,55 +255,42 @@ int ipacLatestCarrier(void)
 /*******************************************************************************
 
 Routine:
-    ipmCheck
+    ipcCheckId
 
 Function:
-    Check on presence of an IPAC module at the given carrier & slot number.
+    Check on presence of an IPAC ID Prom at the given location.
 
 Description:
-    Does a quick check to make sure the carrier and slot numbers are legal, 
-    probes the IDprom space to ensure an IPAC is installed, and checks that 
-    the IDprom starts with the "IPAC" identifier.
+    This routine must not be called if no module is present and an
+    access to the id pointer could trigger a bus error or SEGV. It
+    checks that the ID Prom starts with the format-1 "IPAC" or "IPAH"
+    or format-2 "VITA4 " identifiers.
 
 Returns:
     0 = OK,
-    S_IPAC_badAddress = Bad carrier or slot number,
-    S_IPAC_noModule = No module installed,
-    S_IPAC_noIpacId = "IPAC"/"VITA4 " identifier not found
+    S_IPAC_badDriver = NULL pointer passed for id
+    S_IPAC_noIpacId = "IPAC"/"IPAH"/"VITA4 " identifier not found
 
 */
 
-int ipmCheck (
-    int carrier,
-    int slot
+int ipcCheckId (
+    ipac_idProm_t *id
 ) {
-    ipac_idProm_t *id;
     epicsUInt16 word;
 
-    if (carrier < 0 ||
-	carrier >= carriers.number ||
-	slot < 0 ||
-	slot >= carriers.info[carrier].driver->numberSlots) {
-	return S_IPAC_badAddress;
-    }
-
-    id = (ipac_idProm_t *) ipmBaseAddr(carrier, slot, ipac_addrID);
     if (id == NULL) {
 	return S_IPAC_badDriver;
     }
-
-    if (devReadProbe(sizeof(word), (void *)&id->asciiI, (char *)&word)) {
-	return S_IPAC_noModule;
-    }
+    word = id->asciiI;
     if ((word & 0xff) != 'I') {
 	return S_IPAC_noIpacId;
     }
 
     /*
      * The Format-1 check is deliberately de-optimized to fix a problem with
-     * one particular IP module which can't handle the back-to-back accesses
-     * that the cc68k compiler generates if the "IPAC" ID is tested in a
-     * single if() statement.  Format-2 modules should be Ok though.
+     * IP modules which can't handle back-to-back accesses that compilers
+     * may generate if the "IPAC" ID is tested in a single if () statement.
+     * Format-2 modules should be Ok though.
      */
 
     if ((id->asciiP & 0xff) != 'P') {
@@ -291,6 +312,60 @@ int ipmCheck (
     }
 
     return OK;
+}
+
+
+/*******************************************************************************
+
+Routine:
+    ipmCheck
+
+Function:
+    Check on presence of an IPAC module at the given carrier & slot number.
+
+Description:
+    Checks to make sure the carrier and slot numbers are legal, then probes for
+    the presence of an ID Prom, delegating this operation to the carrier driver
+    if it provides a moduleProbe() routine. If access to a the ID Prom space is
+    safe it delegates checking the IPAC header to the ipcCheckId() routine.
+
+Returns:
+    0 = OK,
+    S_IPAC_badAddress = Bad carrier or slot number,
+    S_IPAC_badDriver = Carrier driver returned NULL ID address,
+    S_IPAC_noModule = No module installed,
+    S_IPAC_noIpacId = "IPAC"/"IPAH"/"VITA4 " identifier not found.
+
+*/
+
+int ipmCheck (
+    int carrier,
+    int slot
+) {
+    ipac_idProm_t *id;
+
+    if (carrier < 0 ||
+	carrier >= carriers.number ||
+	slot < 0 ||
+	slot >= carriers.info[carrier].driver->numberSlots) {
+	return S_IPAC_badAddress;
+    }
+
+    id = (ipac_idProm_t *) ipmBaseAddr(carrier, slot, ipac_addrID);
+
+    if (carriers.info[carrier].driver->moduleProbe == NULL) {
+	epicsUInt16 word;
+
+	if (devReadProbe(sizeof(word), (void *)&id->asciiI, (char *)&word)) {
+	    return S_IPAC_noModule;
+	}
+    }
+    else {
+	if (carriers.info[carrier].driver->moduleProbe(
+		carriers.info[carrier].cPrivate, slot) == 0)
+	return S_IPAC_noModule;
+    }
+    return ipcCheckId(id);
 }
 
 
@@ -391,9 +466,9 @@ Function:
     Validate a particular IPAC module type at the given carrier & slot number.
 
 Description:
-    Uses ipmCheck to ensure the carrier and slot numbers are legal, probe the 
-    IDprom and check that the IDprom looks like an IPAC module.  Calculates 
-    the CRC for the ID Prom, and compares the manufacturer and model ID values 
+    Uses ipmCheck to ensure the carrier and slot numbers are legal, probe the
+    IDprom and check that the IDprom looks like an IPAC module.  Calculates
+    the CRC for the ID Prom, and compares the manufacturer and model ID values
     in the Prom to the ones given.
 
 Returns:
@@ -461,9 +536,9 @@ Function:
     returns printable string giving status of module at given carrier/slot.
 
 Description:
-    Generates a report string describing the given IPAC slot.  If a module 
-    is installed, it includes the manufacturer and model ID numbers.  If 
-    the report function is supported by the carrier driver this report 
+    Generates a report string describing the given IPAC slot.  If a module
+    is installed, it includes the manufacturer and model ID numbers.  If
+    the report function is supported by the carrier driver this report
     string is appended.
 
 Returns:
@@ -535,14 +610,14 @@ Function:
 
 Description:
     Checks its input parameters, then calls the carrier driver.  This will
-    return a pointer to the location of the address space indicated by the 
-    space parameter.  All IP modules must provide an ID prom to indicate 
-    the module type (space = ipac_addrID).  Most modules need register I/O 
-    locations, which are in the I/O space (space = ipac_addrIO).  Some 
-    types of module also provide memory (space = ipac_addrMem), but if 
-    this is not required the carrier may allow it to be disabled, in which 
-    case the driver should return a NULL for this address space.  Some 
-    carriers provide a 32-bit wide I/O space for Dual-slot IP modules; 
+    return a pointer to the location of the address space indicated by the
+    space parameter.  All IP modules must provide an ID prom to indicate
+    the module type (space = ipac_addrID).  Most modules need register I/O
+    locations, which are in the I/O space (space = ipac_addrIO).  Some
+    types of module also provide memory (space = ipac_addrMem), but if
+    this is not required the carrier may allow it to be disabled, in which
+    case the driver should return a NULL for this address space.  Some
+    carriers provide a 32-bit wide I/O space for Dual-slot IP modules;
     carriers which do not should return NULL for this space.
 
 Returns:
@@ -551,7 +626,7 @@ Returns:
 */
 
 void *ipmBaseAddr (
-    int carrier, 
+    int carrier,
     int slot,
     ipac_addr_t space
 ) {
@@ -575,9 +650,9 @@ Function:
     Send command to slot interrupt controller.
 
 Description:
-    Checks input parameters, then passes the interrupt command request to 
-    the carrier driver routine.  The driver is only required to support 
-    the command ipac_irqEnable; for other commands it may return the status 
+    Checks input parameters, then passes the interrupt command request to
+    the carrier driver routine.  The driver is only required to support
+    the command ipac_irqEnable; for other commands it may return the status
     code S_IPAC_notImplemented and do nothing.
 
 Returns:
@@ -617,7 +692,7 @@ Function:
     Connect module driver to interrupt vector number
 
 Description:
-    Checks input parameters, then passes the request to the carrier driver 
+    Checks input parameters, then passes the request to the carrier driver
     routine.  If no carrier routine is provided it calls the standard devLib
     devConnectInterruptVME routine instead.  This is not quite a straight
     replacement for devConnectInterruptVME though, as drvIpac was designed
@@ -652,10 +727,10 @@ LOCAL void intShim(void *parm) {
 #endif
 
 int ipmIntConnect (
-	int carrier, 
-	int slot, 
-	int vecNum, 
-	void (*routine)(int parameter), 
+	int carrier,
+	int slot,
+	int vecNum,
+	void (*routine)(int parameter),
 	int parameter
 ) {
     if (carrier < 0 ||
@@ -682,7 +757,7 @@ int ipmIntConnect (
     }
 
     return carriers.info[carrier].driver->intConnect(
-		carriers.info[carrier].cPrivate, slot, vecNum, 
+		carriers.info[carrier].cPrivate, slot, vecNum,
 		routine, parameter);
 }
 
@@ -697,8 +772,8 @@ Function:
 
 Description:
     Prints information on each known carrier board and slot according to the
-    specified interest level.  Level 0 lists carriers only, with the number 
-    of slots it supports.  Level 1 gives each slot, manufacturer & model ID 
+    specified interest level.  Level 0 lists carriers only, with the number
+    of slots it supports.  Level 1 gives each slot, manufacturer & model ID
     of the installed module (if any), and the carrier driver report for that
     slot.  Level 2 adds the address of each memory space for the slot.
 
@@ -707,25 +782,25 @@ Returns:
 
 */
 
-int ipacReport (
+long ipacReport (
     int interest
 ) {
     int carrier, slot;
 
     for (carrier=0; carrier < carriers.number; carrier++) {
-	printf("  IP Carrier %2d: %s, %d slots\n", carrier, 
+	printf("  IP Carrier %2d: %s, %d slots\n", carrier,
 		carriers.info[carrier].driver->carrierType,
 		carriers.info[carrier].driver->numberSlots);
 
 	if (interest > 0) {
 	    void *memBase, *io32Base;
 
-	    for (slot=0; slot < carriers.info[carrier].driver->numberSlots; 
+	    for (slot=0; slot < carriers.info[carrier].driver->numberSlots;
 		 slot++) {
 		printf("    %s\n", ipmReport(carrier, slot));
 
 		if (interest > 1) {
-		    printf("      ID = %p, I/O = %p", 
+		    printf("      ID = %p, I/O = %p",
 			    ipmBaseAddr(carrier, slot, ipac_addrID),
 			    ipmBaseAddr(carrier, slot, ipac_addrIO));
 		    io32Base = ipmBaseAddr(carrier, slot, ipac_addrIO32);
@@ -761,9 +836,6 @@ Returns:
 
 */
 
-LOCAL int ipacInitialise (
-    int after
-) {
+LOCAL long ipacInitialise (void) {
     return OK;
 }
-

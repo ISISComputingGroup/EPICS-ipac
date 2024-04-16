@@ -10,11 +10,9 @@ Description:
     CANBUS Analogue Input device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     8 August 1995
-Version:
-    $Id: devAiCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -39,6 +37,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <stdlib.h>
 #include <string.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbDefs.h>
@@ -85,8 +85,8 @@ typedef struct aiCanBus_s {
     int status;
 } aiCanBus_t;
 
-static long init_ai(struct aiRecord *prec);
-static long get_ioint_info(int cmd, struct aiRecord *prec, IOSCANPVT *ppvt);
+static long init_ai(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long read_ai(struct aiRecord *prec);
 static long special_linconv(struct aiRecord *prec, int after);
 static void ProcessCallback(CALLBACK *pcallback);
@@ -94,20 +94,21 @@ static void aiMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pCallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN read_ai;
-    DEVSUPFUN special_linconv;
-} devAiCan = {
-    6,
-    NULL,
-    NULL,
-    init_ai,
-    get_ioint_info,
+#ifndef HAS_aidset
+typedef struct aidset {
+    dset common;
+    long (*read_ai)(struct aiRecord *prec);
+    long (*linconv)(struct aiRecord *prec, int after);
+} aidset;
+#endif
+aidset devAiCan = {
+    {
+        6,
+        NULL,
+        NULL,
+        init_ai,
+        get_ioint_info
+    },
     read_ai,
     special_linconv
 };
@@ -117,8 +118,9 @@ static aiCanBus_t *firstBus;
 
 
 static long init_ai (
-    struct aiRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct aiRecord *prec = (struct aiRecord *) pcommon;
     aiCanPrivate_t *pcanAi;
     aiCanBus_t *pbus;
     int status;
@@ -257,9 +259,10 @@ static long init_ai (
 
 static long get_ioint_info (
     int cmd,
-    struct aiRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct aiRecord *prec = (struct aiRecord *) pcommon;
     aiCanPrivate_t *pcanAi = prec->dpvt;
 
     if (pcanAi->ioscanpvt == NULL) {
