@@ -10,11 +10,9 @@ Description:
     CANBUS Binary Output device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     14 August 1995
-Version:
-    $Id: devBoCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -38,6 +36,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbAccess.h>
@@ -76,26 +76,27 @@ typedef struct boCanBus_s {
     int status;
 } boCanBus_t;
 
-static long init_bo(struct boRecord *prec);
-static long get_ioint_info(int cmd, struct boRecord *prec, IOSCANPVT *ppvt);
+static long init_bo(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long write_bo(struct boRecord *prec);
 static void boMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pCallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN write_bo;
-} devBoCan = {
-    5,
-    NULL,
-    NULL,
-    init_bo,
-    get_ioint_info,
+#ifndef HAS_bodset
+typedef struct {
+    dset common;
+    long (*write_bo)(struct boRecord *prec);
+} bodset;
+#endif
+bodset devBoCan = {
+    {
+        5,
+        NULL,
+        NULL,
+        init_bo,
+        get_ioint_info
+    },
     write_bo
 };
 epicsExportAddress(dset, devBoCan);
@@ -104,8 +105,9 @@ static boCanBus_t *firstBus;
 
 
 static long init_bo (
-    struct boRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct boRecord *prec = (struct boRecord *) pcommon;
     boCanPrivate_t *pcanBo;
     boCanBus_t *pbus;
     int status;
@@ -192,9 +194,10 @@ static long init_bo (
 
 static long get_ioint_info (
     int cmd,
-    struct boRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct boRecord *prec = (struct boRecord *) pcommon;
     boCanPrivate_t *pcanBo = prec->dpvt;
 
     if (pcanBo->ioscanpvt == NULL) {

@@ -10,11 +10,9 @@ Description:
     CANBUS Multi-Bit Binary Input Direct device support
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     14 August 1995
-Version:
-    $Id: devMbbiDirectCan.c 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 
@@ -38,6 +36,8 @@ Copyright (c) 1995-2000 Andrew Johnson
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <epicsTypes.h>
+#include <epicsTimer.h>
 #include <errMdef.h>
 #include <devLib.h>
 #include <dbAccess.h>
@@ -79,27 +79,28 @@ typedef struct mbbiDirectCanBus_s {
     int status;
 } mbbiDirectCanBus_t;
 
-static long init_mbbiDirect(struct mbbiDirectRecord *prec);
-static long get_ioint_info(int cmd, struct mbbiDirectRecord *prec, IOSCANPVT *ppvt);
+static long init_mbbiDirect(struct dbCommon *prec);
+static long get_ioint_info(int cmd, struct dbCommon *prec, IOSCANPVT *ppvt);
 static long read_mbbiDirect(struct mbbiDirectRecord *prec);
 static void ProcessCallback(CALLBACK *pcallback);
 static void mbbiDirectMessage(void *private, const canMessage_t *pmessage);
 static void busSignal(void *private, int status);
 static void busCallback(CALLBACK *pCallback);
 
-struct {
-    long number;
-    DEVSUPFUN report;
-    DEVSUPFUN init;
-    DEVSUPFUN init_record;
-    DEVSUPFUN get_ioint_info;
-    DEVSUPFUN read_mbbiDirect;
-} devMbbiDirectCan = {
-    5,
-    NULL,
-    NULL,
-    init_mbbiDirect,
-    get_ioint_info,
+#ifndef HAS_mbbidirectdset
+typedef struct {
+    dset common;
+    long (*read_mbbiDirect)(struct mbbiDirectRecord *prec);
+} mbbidirectdset;
+#endif
+mbbidirectdset devMbbiDirectCan = {
+    {
+        5,
+        NULL,
+        NULL,
+        init_mbbiDirect,
+        get_ioint_info
+    },
     read_mbbiDirect
 };
 epicsExportAddress(dset, devMbbiDirectCan);
@@ -108,8 +109,9 @@ static mbbiDirectCanBus_t *firstBus;
 
 
 static long init_mbbiDirect (
-    struct mbbiDirectRecord *prec
+    struct dbCommon *pcommon
 ) {
+    struct mbbiDirectRecord *prec = (struct mbbiDirectRecord *) pcommon;
     mbbiDirectCanPrivate_t *pcanMbbiDirect;
     mbbiDirectCanBus_t *pbus;
     int status;
@@ -211,9 +213,10 @@ static long init_mbbiDirect (
 
 static long get_ioint_info (
     int cmd,
-    struct mbbiDirectRecord *prec, 
+    struct dbCommon *pcommon,
     IOSCANPVT *ppvt
 ) {
+    struct mbbiDirectRecord *prec = (struct mbbiDirectRecord *) pcommon;
     mbbiDirectCanPrivate_t *pcanMbbiDirect = prec->dpvt;
 
     if (pcanMbbiDirect->ioscanpvt == NULL) {

@@ -4,7 +4,6 @@
 <META NAME="Author" CONTENT="Andrew Johnson">
 <META NAME="Description" CONTENT="Release Notes for the vxWorks/EPICS CANbus and IPAC driver software">
 <META NAME="KeyWords" CONTENT="CANbus, vxWorks, IPAC, EPICS, Tip810">
-<META NAME="Version" CONTENT="$Id: canRelease.html 178 2008-12-19 21:09:54Z anj $">
 </HEAD>
 <BODY>
 
@@ -19,6 +18,37 @@ the bottom, with more recent releases above it. Missing version numbers merely
 imply that changes were made elsewhere in the drvIpac package without any
 changes to the CANbus driver.</P>
 
+<HR>
+
+<H2>Version 2.16</H2>
+
+<P>Changed:</P>
+<UL>
+
+<LI>Fixed a <TT>printf()</TT> format string in <TT>t810Report()</TT>.</LI>
+
+</UL>
+
+<P>Added:</P>
+<UL>
+
+<LI>When built against EPICS 7.0.4 or later the device support code makes use of
+the record-specific device support entry table structures that are now being
+defined inside the record header files. This provides protection against any
+future changes to the device support entry structure definitions.</LI>
+
+</UL>
+<HR>
+
+<H2>Version 2.15</H2>
+
+<P>Changed:</P>
+<UL>
+
+<LI>Adjusted the build to clean up deprecation warnings introduced by
+Base-3.16.1 by switching to using the typed rset.</LI>
+
+</UL>
 <HR>
 
 <H2>Version 2.10</H2>

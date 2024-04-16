@@ -11,11 +11,9 @@ Description:
     layout and programming model for the chip used on the TIP810 IP module.
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     19 July 1995
-Version:
-    $Id: pca82c200.h 177 2008-11-11 20:41:45Z anj $
 
 Copyright (c) 1995-2000 Andrew Johnson
 

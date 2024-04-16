@@ -1,4 +1,6 @@
+
 O.*/
+**/O.*
 /db
 /bin
 /dbd
@@ -13,3 +15,5 @@ runIOC.sh
 relPaths.sh
 /html/
 .project
+/configure/*.local
+

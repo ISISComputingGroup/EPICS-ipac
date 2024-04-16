@@ -12,11 +12,9 @@ Description:
 	2. Downwards to the IPAC Carrier driver
 
 Author:
-    Andrew Johnson <anjohnson@iee.org>
+    Andrew Johnson <Andrew.N.Johnson@gmail.com>
 Created:
     1 July 1995
-Version:
-    $Id: drvIpac.h 180 2009-08-20 05:02:11Z anj $
 
 Copyright (c) 1995-2007 Andrew Johnson
 
@@ -141,10 +139,10 @@ typedef enum {
 } ipac_addr_t;
 
 
-/* The following are the possible commands to the carrier driver to 
-   handle configuration for the IP modules.  Most carriers will only be 
-   able to implement a subset of these commands.  Note that irqEnable 
-   should call the vxWorks sysBusEnable routine if this is needed to 
+/* The following are the possible commands to the carrier driver to
+   handle configuration for the IP modules.  Most carriers will only be
+   able to implement a subset of these commands.  Note that irqEnable
+   should call the vxWorks sysBusEnable routine if this is needed to
    pass the carrier interrupts through to the CPU. The ipac_stat commands
    were added for the VIPC664, and provide a means for showing the current
    status of each module using LEDs provided for each slot. */
@@ -152,10 +150,10 @@ typedef enum {
 typedef enum {
     ipac_irqLevel0 = 0,	/* Disables interrupts */
     ipac_irqLevel1 = 1,	/* Lowest priority */
-    ipac_irqLevel2 = 2,	
-    ipac_irqLevel3 = 3,	
-    ipac_irqLevel4 = 4,	
-    ipac_irqLevel5 = 5,	
+    ipac_irqLevel2 = 2,
+    ipac_irqLevel3 = 3,
+    ipac_irqLevel4 = 4,
+    ipac_irqLevel5 = 5,
     ipac_irqLevel6 = 6,	/* Highest priority */
     ipac_irqLevel7 = 7,	/* Non-maskable, don't use */
     ipac_irqGetLevel,	/* Returns level set (or hard-coded) */
@@ -191,16 +189,27 @@ typedef struct {
     int (*irqCmd)(void *cPrivate, epicsUInt16 slot,
 		epicsUInt16 irqNumber, ipac_irqCmd_t cmd);
 			/* Interrupt manipulation */
+    /* The remaining routines are optional. Some drvIpac routines may call
+     * devLib if these routines are NULL or not provided. */
     int (*intConnect)(void *cPrivate, epicsUInt16 slot, epicsUInt16 vecNum,
 		void (*routine)(int parameter), int parameter);
 			/* Connect routine to interrupt vector */
+    int (*moduleProbe)(void *cPrivate, epicsUInt16 slot);
+			/* Return 0 if reading ID Prom would Bus Error */
 } ipac_carrier_t;
 
 
 /* Functions for startup and interactive use */
 
 epicsShareFunc int ipacAddCarrier(ipac_carrier_t *pcarrier, const char *cardParams);
-epicsShareFunc int ipacReport(int interest);
+epicsShareFunc long ipacReport(int interest);
+epicsShareFunc int ipacAddNullCarrier (void);
+epicsShareFunc int ipacLatestCarrier(void);
+
+
+/* Functions for use in IPAC carrier drivers */
+
+epicsShareFunc int ipcCheckId(ipac_idProm_t *id);
 
 
 /* Functions for use in IPAC module drivers */
@@ -210,9 +219,9 @@ epicsShareFunc int ipmValidate(int carrier, int slot,
 		int manufacturerId, int modelId);
 epicsShareFunc char *ipmReport(int carrier, int slot);
 epicsShareFunc void *ipmBaseAddr(int carrier, int slot, ipac_addr_t space);
-epicsShareFunc int ipmIrqCmd(int carrier, int slot, 
+epicsShareFunc int ipmIrqCmd(int carrier, int slot,
 		int irqNumber, ipac_irqCmd_t cmd);
-epicsShareFunc int ipmIntConnect(int carrier, int slot, int vector, 
+epicsShareFunc int ipmIntConnect(int carrier, int slot, int vector,
 		void (*routine)(int parameter), int parameter);
 
 
@@ -221,4 +230,3 @@ epicsShareFunc int ipmIntConnect(int carrier, int slot, int vector,
 #endif
 
 #endif /* INCipacH */
-
